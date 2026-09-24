@@ -19,6 +19,7 @@
 #define K380_REPORT_SIZE 7
 
 #ifdef AUTO_WATCH
+#define IDI_APP_ICON 101
 static const unsigned char fn_keys_report[K380_REPORT_SIZE] = {0x10, 0xff, 0x0b, 0x1e, 0x00, 0x00, 0x00};
 static const unsigned char media_keys_report[K380_REPORT_SIZE] = {0x10, 0xff, 0x0b, 0x1e, 0x01, 0x00, 0x00};
 #elif defined(setMediaKeys)
@@ -354,124 +355,6 @@ static void update_settings_window(void)
             swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：HID 接口暂不可写，将继续重试");
         SetWindowTextW(status_label, status);
     }
-}
-
-static HICON create_fn_tray_icon(void)
-{
-    HDC screen = GetDC(NULL);
-    HDC color_dc = NULL;
-    HDC mask_dc = NULL;
-    HBITMAP color_bitmap = NULL;
-    HBITMAP mask_bitmap = NULL;
-    DWORD *color_pixels = NULL;
-    HGDIOBJ old_color_bitmap = NULL;
-    HGDIOBJ old_mask_bitmap = NULL;
-    HGDIOBJ old_object;
-    HGDIOBJ old_color_brush;
-    HGDIOBJ old_color_pen;
-    HGDIOBJ old_mask_brush;
-    HGDIOBJ old_mask_pen;
-    HBRUSH white_brush = NULL;
-    HBRUSH black_brush = NULL;
-    HPEN red_pen = NULL;
-    HFONT icon_font = NULL;
-    HICON icon = NULL;
-    ICONINFO icon_info = {0};
-    BITMAPINFO bitmap_info = {0};
-    RECT icon_rect = {2, 2, 30, 30};
-    RECT text_rect = {5, 7, 27, 25};
-    wchar_t label[] = L"Fn";
-
-    if (screen == NULL)
-        return NULL;
-    color_dc = CreateCompatibleDC(screen);
-    mask_dc = CreateCompatibleDC(screen);
-    bitmap_info.bmiHeader.biSize = sizeof(bitmap_info.bmiHeader);
-    bitmap_info.bmiHeader.biWidth = 32;
-    bitmap_info.bmiHeader.biHeight = -32;
-    bitmap_info.bmiHeader.biPlanes = 1;
-    bitmap_info.bmiHeader.biBitCount = 32;
-    bitmap_info.bmiHeader.biCompression = BI_RGB;
-    color_bitmap = CreateDIBSection(screen, &bitmap_info, DIB_RGB_COLORS,
-                                    (void **)&color_pixels, NULL, 0);
-    mask_bitmap = CreateBitmap(32, 32, 1, 1, NULL);
-    if (color_dc == NULL || mask_dc == NULL || color_bitmap == NULL ||
-        color_pixels == NULL || mask_bitmap == NULL)
-        goto cleanup;
-
-    old_color_bitmap = SelectObject(color_dc, color_bitmap);
-    old_mask_bitmap = SelectObject(mask_dc, mask_bitmap);
-    white_brush = CreateSolidBrush(RGB(255, 255, 255));
-    black_brush = CreateSolidBrush(RGB(0, 0, 0));
-    red_pen = CreatePen(PS_SOLID, 3, RGB(210, 42, 48));
-    if (white_brush == NULL || black_brush == NULL || red_pen == NULL)
-        goto cleanup;
-
-    FillRect(color_dc, &(RECT){0, 0, 32, 32}, black_brush);
-    old_color_brush = SelectObject(color_dc, white_brush);
-    old_color_pen = SelectObject(color_dc, red_pen);
-    Ellipse(color_dc, icon_rect.left, icon_rect.top, icon_rect.right, icon_rect.bottom);
-    MoveToEx(color_dc, 9, 23, NULL);
-    LineTo(color_dc, 23, 9);
-    SelectObject(color_dc, old_color_brush);
-    SelectObject(color_dc, old_color_pen);
-    icon_font = CreateFontW(-13, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
-                            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-    if (icon_font != NULL) {
-        old_object = SelectObject(color_dc, icon_font);
-        SetBkMode(color_dc, TRANSPARENT);
-        SetTextColor(color_dc, RGB(28, 48, 72));
-        DrawTextW(color_dc, label, -1, &text_rect, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
-        SelectObject(color_dc, old_object);
-    }
-
-    FillRect(mask_dc, &(RECT){0, 0, 32, 32}, white_brush);
-    old_mask_brush = SelectObject(mask_dc, black_brush);
-    old_mask_pen = SelectObject(mask_dc, GetStockObject(NULL_PEN));
-    Ellipse(mask_dc, icon_rect.left, icon_rect.top, icon_rect.right, icon_rect.bottom);
-    SelectObject(mask_dc, old_mask_brush);
-    SelectObject(mask_dc, old_mask_pen);
-
-    /* Set a real alpha channel so the unused pixels stay transparent in the tray. */
-    for (int y = 0; y < 32; ++y) {
-        for (int x = 0; x < 32; ++x) {
-            DWORD *pixel = &color_pixels[y * 32 + x];
-            if (GetPixel(mask_dc, x, y) == RGB(0, 0, 0))
-                *pixel |= 0xff000000;
-            else
-                *pixel = 0;
-        }
-    }
-
-    icon_info.fIcon = TRUE;
-    icon_info.hbmColor = color_bitmap;
-    icon_info.hbmMask = mask_bitmap;
-    icon = CreateIconIndirect(&icon_info);
-
-cleanup:
-    if (old_color_bitmap != NULL)
-        SelectObject(color_dc, old_color_bitmap);
-    if (old_mask_bitmap != NULL)
-        SelectObject(mask_dc, old_mask_bitmap);
-    if (icon_font != NULL)
-        DeleteObject(icon_font);
-    if (red_pen != NULL)
-        DeleteObject(red_pen);
-    if (white_brush != NULL)
-        DeleteObject(white_brush);
-    if (black_brush != NULL)
-        DeleteObject(black_brush);
-    if (color_bitmap != NULL)
-        DeleteObject(color_bitmap);
-    if (mask_bitmap != NULL)
-        DeleteObject(mask_bitmap);
-    if (color_dc != NULL)
-        DeleteDC(color_dc);
-    if (mask_dc != NULL)
-        DeleteDC(mask_dc);
-    ReleaseDC(NULL, screen);
-    return icon;
 }
 
 static void add_tray_icon(HWND window)
@@ -878,7 +761,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command_line, i
         CloseHandle(singleton);
         return 1;
     }
-    fn_tray_icon = create_fn_tray_icon();
+    fn_tray_icon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+                                     32, 32, LR_DEFAULTCOLOR | LR_SHARED);
 
     window_definition.lpfnWndProc = watch_window_proc;
     window_definition.hInstance = instance;
@@ -947,10 +831,6 @@ unregister_class:
     UnregisterClassW(main_window_class, instance);
     UnregisterClassW(settings_window_class, instance);
 done:
-    if (fn_tray_icon != NULL) {
-        DestroyIcon(fn_tray_icon);
-        fn_tray_icon = NULL;
-    }
     hid_exit();
     CloseHandle(singleton);
     return exit_code;

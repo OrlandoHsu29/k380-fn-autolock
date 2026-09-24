@@ -30,14 +30,35 @@ if ($target -match '^(x86_64|amd64)') {
 }
 
 $source = Join-Path $PSScriptRoot 'main.c'
+$resource = Join-Path $PSScriptRoot 'app-icon.rc'
+$icon = Join-Path $PSScriptRoot 'media\k380-fn-autolock-logo.ico'
 $include = Join-Path $PSScriptRoot 'hidapi\include'
 $library = Join-Path $PSScriptRoot "hidapi\$architecture"
 $output = Join-Path $PSScriptRoot 'build'
+$windres = Join-Path (Split-Path -Parent $compilerPath) 'windres.exe'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
+
+if (-not (Test-Path -LiteralPath $icon -PathType Leaf)) {
+    throw "Application icon not found: $icon"
+}
+if (-not (Test-Path -LiteralPath $windres -PathType Leaf)) {
+    $windresCommand = Get-Command windres -ErrorAction SilentlyContinue
+    if ($windresCommand) {
+        $windres = $windresCommand.Source
+    } else {
+        throw 'windres.exe was not found next to gcc.exe or in PATH.'
+    }
+}
+
+$resourceObject = Join-Path $output 'app-icon.o'
+& $windres -i $resource -o $resourceObject -I $PSScriptRoot
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not compile the application icon resource.'
+}
 
 function Invoke-Build([string]$name, [string[]]$extraArgs) {
     $destination = Join-Path $output $name
-    & $compilerPath -std=c11 -finput-charset=UTF-8 -g -O0 -Wall -Wextra "-I$include" $source @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
+    & $compilerPath -std=c11 -finput-charset=UTF-8 -g -O0 -Wall -Wextra "-I$include" $source $resourceObject @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed: $name"
     }
