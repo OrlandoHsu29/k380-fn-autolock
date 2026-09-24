@@ -37,7 +37,7 @@ New-Item -ItemType Directory -Path $output -Force | Out-Null
 
 function Invoke-Build([string]$name, [string[]]$extraArgs) {
     $destination = Join-Path $output $name
-    & $compilerPath -std=c11 -g -O0 -Wall -Wextra "-I$include" $source @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops
+    & $compilerPath -std=c11 -finput-charset=UTF-8 -g -O0 -Wall -Wextra "-I$include" $source @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed: $name"
     }
