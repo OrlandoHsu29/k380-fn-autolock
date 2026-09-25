@@ -165,31 +165,51 @@ void app_ui_update(void)
     int fn_locked;
     int autostart_enabled;
     int tray_hidden;
+    int fn_mode_changed;
     const wchar_t *mode_status;
 
     if (g_app.settings_window == NULL)
         return;
     g_app.autostart_enabled = app_settings_autostart_enabled();
+    fn_mode_changed = settings_draft_valid && settings_draft_fn_locked != g_app.fn_locked;
+    if (g_app.startup_checkbox != NULL)
+        SetWindowTextW(g_app.startup_checkbox,
+                       settings_draft_valid && settings_draft_autostart_enabled != g_app.autostart_enabled
+                           ? L"开机时自动启动*"
+                           : L"开机时自动启动");
     if (g_app.fn_lock_radio != NULL) {
+        SetWindowTextW(g_app.fn_lock_radio,
+                       fn_mode_changed && settings_draft_fn_locked
+                           ? L"锁定 Fn（F1–F12 优先）*"
+                           : L"锁定 Fn（F1–F12 优先）");
         EnableWindow(g_app.fn_lock_radio, !(settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked));
         InvalidateRect(g_app.fn_lock_radio, NULL, TRUE);
     }
     if (g_app.fn_unlock_radio != NULL) {
+        SetWindowTextW(g_app.fn_unlock_radio,
+                       fn_mode_changed && !settings_draft_fn_locked
+                           ? L"解除锁定（媒体键优先）*"
+                           : L"解除锁定（媒体键优先）");
         EnableWindow(g_app.fn_unlock_radio, settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked);
         InvalidateRect(g_app.fn_unlock_radio, NULL, TRUE);
     }
     if (g_app.startup_checkbox != NULL)
         InvalidateRect(g_app.startup_checkbox, NULL, TRUE);
-    if (g_app.tray_checkbox != NULL)
+    if (g_app.tray_checkbox != NULL) {
+        SetWindowTextW(g_app.tray_checkbox,
+                       settings_draft_valid && settings_draft_tray_visible != g_app.show_tray_icon
+                           ? L"隐藏任务栏图标*"
+                           : L"隐藏任务栏图标");
         InvalidateRect(g_app.tray_checkbox, NULL, TRUE);
+    }
     SetWindowTextW(g_app.settings_window,
                    settings_have_unsaved_changes()
                        ? L"K380 Fn Auto Lock " APP_VERSION L"*"
                        : L"K380 Fn Auto Lock " APP_VERSION);
     if (g_app.status_label != NULL) {
-        fn_locked = settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked;
-        autostart_enabled = settings_draft_valid ? settings_draft_autostart_enabled : g_app.autostart_enabled;
-        tray_hidden = !(settings_draft_valid ? settings_draft_tray_visible : g_app.show_tray_icon);
+        fn_locked = g_app.fn_locked;
+        autostart_enabled = g_app.autostart_enabled;
+        tray_hidden = !g_app.show_tray_icon;
         mode_status = fn_locked ? L"F 键优先" : L"媒体键优先";
         if (autostart_enabled && tray_hidden)
             swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：开机自启、%ls、隐藏图标", mode_status);
