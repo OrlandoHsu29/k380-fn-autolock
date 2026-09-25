@@ -29,8 +29,14 @@ if ($target -match '^(x86_64|amd64)') {
     throw "Unsupported gcc target: $target"
 }
 
-$source = Join-Path $PSScriptRoot 'main.c'
-$resource = Join-Path $PSScriptRoot 'app-icon.rc'
+$appSourceDirectory = Join-Path $PSScriptRoot 'src\app'
+$deviceSourceDirectory = Join-Path $PSScriptRoot 'src\device'
+$source = Join-Path $appSourceDirectory 'main.c'
+$hidSource = Join-Path $deviceSourceDirectory 'k380_hid.c'
+$settingsSource = Join-Path $appSourceDirectory 'app_settings.c'
+$stateSource = Join-Path $appSourceDirectory 'app_state.c'
+$uiSource = Join-Path $appSourceDirectory 'app_ui.c'
+$resource = Join-Path $PSScriptRoot 'resources\app-icon.rc'
 $icon = Join-Path $PSScriptRoot 'media\k380-fn-autolock-logo.ico'
 $include = Join-Path $PSScriptRoot 'hidapi\include'
 $library = Join-Path $PSScriptRoot "hidapi\$architecture"
@@ -56,17 +62,17 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Could not compile the application icon resource.'
 }
 
-function Invoke-Build([string]$name, [string[]]$extraArgs) {
+function Invoke-Build([string]$name, [string[]]$sourceFiles, [string[]]$extraArgs) {
     $destination = Join-Path $output $name
-    & $compilerPath -std=c11 -finput-charset=UTF-8 -g -O0 -Wall -Wextra "-I$include" $source $resourceObject @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
+    & $compilerPath -std=c11 -finput-charset=UTF-8 -g -O0 -Wall -Wextra "-I$include" "-I$appSourceDirectory" "-I$deviceSourceDirectory" @sourceFiles $resourceObject @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed: $name"
     }
 }
 
-Invoke-Build 'setFnKeys.exe' @()
-Invoke-Build 'setMediaKeys.exe' @('-DsetMediaKeys')
-Invoke-Build 'k380FnAutoLock.exe' @('-DAUTO_WATCH', '-mwindows')
+Invoke-Build 'setFnKeys.exe' @($source, $hidSource) @()
+Invoke-Build 'setMediaKeys.exe' @($source, $hidSource) @('-DsetMediaKeys')
+Invoke-Build 'k380FnAutoLock.exe' @($source, $hidSource, $settingsSource, $stateSource, $uiSource) @('-DAUTO_WATCH', '-mwindows')
 Copy-Item -LiteralPath (Join-Path $library 'hidapi.dll') -Destination (Join-Path $output 'hidapi.dll') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hidapi\LICENSE-bsd.txt') -Destination (Join-Path $output 'LICENSE-hidapi-bsd.txt') -Force
 Write-Host "Built K380 tools for $architecture in $output"
