@@ -70,6 +70,14 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1 -Compiler '<MinGW 安装目
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Compiler '<MinGW 安装目录>\bin\gcc.exe' -Release
 ```
 
+安装 Inno Setup 7 后，可用 `build-installer.ps1` 完成 Release 构建并生成中英文安装包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-installer.ps1 -Version 1.0.2 -Compiler '<MinGW 安装目录>\bin\gcc.exe'
+```
+
+安装包按当前用户安装到 `%LOCALAPPDATA%\Programs\K380-Fn-Auto-Lock`，无需管理员权限。卸载时会结束后台进程，并删除开机启动项、程序设置和安装目录。
+
 构建脚本根据 GCC 目标架构选择 `hidapi/x86` 或 `hidapi/x64` 库，并用 `windres` 编译 `resources/app-icon.rc`，将 `media/k380-fn-autolock-logo.ico` 嵌入程序。构建产物位于 `build/`：
 
 - `k380FnAutoLock.exe`：后台自动恢复程序
