@@ -5,8 +5,6 @@
 #include <windows.h>
 
 typedef struct app_state {
-    int needs_apply;
-    DWORD last_success;
     int reconnect_retry;
     DWORD reconnect_started;
     int fn_locked;

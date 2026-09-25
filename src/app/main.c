@@ -18,8 +18,9 @@
 #define IDI_APP_ICON 101
 #define RETRY_TIMER 1
 #define RETRY_INTERVAL_MS 2000
-#define REFRESH_INTERVAL_MS 60000
+#define REFRESH_INTERVAL_MS (15U * 60U * 1000U)
 #define RECONNECT_RETRY_MS 12000
+#define ACTIVE_INPUT_WINDOW_MS 30000
 #define MAX_RADIO_WATCHES 8
 
 typedef struct radio_watch {
@@ -74,15 +75,46 @@ static size_t watch_bluetooth_radios(HWND window, radio_watch *radios, size_t ca
     return count;
 }
 
+static void schedule_check(UINT interval_ms)
+{
+    if (g_app.watcher_window != NULL)
+        SetTimer(g_app.watcher_window, RETRY_TIMER, interval_ms, NULL);
+}
+
+static void request_apply(void)
+{
+    g_app.reconnect_retry = 1;
+    g_app.reconnect_started = GetTickCount();
+    schedule_check(RETRY_INTERVAL_MS);
+}
+
+static int user_recently_active(void)
+{
+    LASTINPUTINFO input = {0};
+
+    input.cbSize = sizeof(input);
+
+    return GetLastInputInfo(&input) &&
+           (DWORD)(GetTickCount() - input.dwTime) < ACTIVE_INPUT_WINDOW_MS;
+}
+
 static void try_apply(void)
 {
     k380_key_mode mode = g_app.fn_locked ? K380_MODE_FN_LOCKED : K380_MODE_MEDIA_KEYS;
 
     g_app.last_apply_result = k380_apply_key_mode(mode, 1);
     if (g_app.last_apply_result == K380_APPLY_OK) {
-        g_app.needs_apply = 0;
-        g_app.last_success = GetTickCount();
+        g_app.reconnect_retry = 0;
+        schedule_check(REFRESH_INTERVAL_MS);
         OutputDebugStringA(g_app.fn_locked ? "K380 Fn mode applied\n" : "K380 media mode applied\n");
+    } else {
+        if (g_app.last_apply_result == K380_APPLY_NOT_FOUND && g_app.reconnect_retry &&
+            (DWORD)(GetTickCount() - g_app.reconnect_started) < RECONNECT_RETRY_MS) {
+            schedule_check(RETRY_INTERVAL_MS);
+        } else {
+            g_app.reconnect_retry = 0;
+            schedule_check(REFRESH_INTERVAL_MS);
+        }
     }
     app_ui_update();
 }
@@ -93,13 +125,7 @@ void app_runtime_set_mode(int desired_fn_locked)
     if (!app_settings_store_fn_locked(g_app.fn_locked))
         MessageBoxW(g_app.settings_window, L"Fn 模式无法保存；本次运行仍会按当前选择处理。",
                     L"K380 Fn 设置", MB_OK | MB_ICONERROR);
-    g_app.needs_apply = 1;
-    g_app.last_apply_result = k380_apply_key_mode(g_app.fn_locked ? K380_MODE_FN_LOCKED : K380_MODE_MEDIA_KEYS, 1);
-    if (g_app.last_apply_result == K380_APPLY_OK) {
-        g_app.needs_apply = 0;
-        g_app.last_success = GetTickCount();
-    }
-    app_ui_update();
+    try_apply();
 }
 
 void app_runtime_set_tray_visibility(int visible)
@@ -120,6 +146,7 @@ static LRESULT CALLBACK watch_window_proc(HWND window, UINT message, WPARAM wpar
 
     switch (message) {
     case WM_APP_SHOW_SETTINGS:
+        request_apply();
         app_ui_show_settings();
         return 0;
     case WM_APP_TRAY_CALLBACK:
@@ -128,7 +155,7 @@ static LRESULT CALLBACK watch_window_proc(HWND window, UINT message, WPARAM wpar
     case WM_DEVICECHANGE:
         if (wparam == DBT_DEVICEARRIVAL || wparam == DBT_DEVICEREMOVECOMPLETE ||
             wparam == DBT_DEVNODES_CHANGED)
-            g_app.needs_apply = 1;
+            request_apply();
         else if (wparam == DBT_CUSTOMEVENT && lparam != 0) {
             const DEV_BROADCAST_HDR *header = (const DEV_BROADCAST_HDR *)lparam;
             const DEV_BROADCAST_HANDLE *event = (const DEV_BROADCAST_HANDLE *)lparam;
@@ -138,29 +165,25 @@ static LRESULT CALLBACK watch_window_proc(HWND window, UINT message, WPARAM wpar
                 header->dbch_size >= offsetof(DEV_BROADCAST_HANDLE, dbch_data) + sizeof(info) &&
                 memcmp(&event->dbch_eventguid, &bluetooth_hci_event_guid, sizeof(GUID)) == 0) {
                 memcpy(&info, event->dbch_data, sizeof(info));
-                if (info.connected) {
-                    g_app.needs_apply = 1;
-                    g_app.reconnect_retry = 1;
-                    g_app.reconnect_started = GetTickCount();
-                }
+                if (info.connected)
+                    request_apply();
             }
         }
         return 0;
     case WM_POWERBROADCAST:
         if (wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND)
-            g_app.needs_apply = 1;
+            request_apply();
         return TRUE;
     case WM_CLOSE:
         DestroyWindow(window);
         return 0;
     case WM_TIMER:
-        if (wparam == RETRY_TIMER &&
-            (g_app.needs_apply || g_app.reconnect_retry ||
-             (DWORD)(GetTickCount() - g_app.last_success) >= REFRESH_INTERVAL_MS))
-            try_apply();
-        if (g_app.reconnect_retry &&
-            (DWORD)(GetTickCount() - g_app.reconnect_started) >= RECONNECT_RETRY_MS)
-            g_app.reconnect_retry = 0;
+        if (wparam == RETRY_TIMER) {
+            if (g_app.reconnect_retry || user_recently_active())
+                try_apply();
+            else
+                schedule_check(REFRESH_INTERVAL_MS);
+        }
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);

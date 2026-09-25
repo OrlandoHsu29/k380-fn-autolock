@@ -35,11 +35,11 @@
 2. 从当前用户注册表读取 Fn 模式和托盘图标显示设置；未保存过时默认选择 Fn 锁定并显示托盘图标。
 3. 初始化 HIDAPI，创建用于接收 Windows 通知的隐藏窗口，并注册 HID 设备通知和蓝牙适配器连接事件。
 4. 启动托盘图标，立即尝试向 K380 写入已保存的按键模式。
-5. 处理连接、设备变化和唤醒事件；定时器每两秒检查是否需要重试。
+5. 处理连接和唤醒事件，并按当前状态安排下一次检查。
 
-设备到达、移除或设备树变化时，程序会安排重新应用设置。收到蓝牙连接事件后，会开启 12 秒的重试窗口，在此期间每两秒尝试一次，以适应键盘连接后 HID 接口才变为可写的情况。电脑从睡眠中唤醒后也会重新尝试。
+收到设备到达、移除、设备树变化、蓝牙连接或电脑唤醒事件后，程序会在约两秒后尝试重新应用设置。如果尚未找到 K380，会在最多 12 秒的窗口内每两秒重试，以等待 HID 接口出现。如果已经找到接口但打开或写入失败，会停止快速重试，避免持续访问可能正在休眠的设备。
 
-正常运行时，程序每 60 秒补写一次作为兜底，以应对 Windows 未发送可用连接通知的情况。具体恢复时间取决于 Windows 和键盘何时准备好 HID 接口。
+没有设备事件时，程序每 15 分钟检查一次。只有最近 30 秒内有用户输入时才定时补写 Fn 设置；电脑空闲时跳过定时补写，设备事件仍会触发恢复。失败后的普通重试也采用 15 分钟间隔，并在电脑空闲时暂停。如果 Windows 漏掉连接事件，再次运行 exe 也会主动安排一次恢复。具体恢复时间取决于 Windows 和键盘何时准备好 HID 接口。
 
 ## 设置与托盘行为
 
@@ -62,6 +62,12 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Compiler '<MinGW 安装目录>\bin\gcc.exe'
+```
+
+打包时可加 `-Release`，使用体积较小的优化构建；省略时保留调试信息，方便源码调试：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1 -Compiler '<MinGW 安装目录>\bin\gcc.exe' -Release
 ```
 
 构建脚本根据 GCC 目标架构选择 `hidapi/x86` 或 `hidapi/x64` 库，并用 `windres` 编译 `resources/app-icon.rc`，将 `media/k380-fn-autolock-logo.ico` 嵌入程序。构建产物位于 `build/`：
