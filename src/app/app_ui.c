@@ -20,7 +20,7 @@
 #define IDM_FN_UNLOCK 204
 #define IDM_HIDE_TRAY 205
 #define IDM_EXIT_PROGRAM 206
-#define APP_VERSION L"v1.0.1"
+#define APP_VERSION L"v1.0.2"
 
 static const wchar_t settings_window_class[] = L"K380FnAutoLockSettingsWindow";
 static HFONT settings_title_font;

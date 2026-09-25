@@ -1,4 +1,4 @@
-param([string]$Compiler)
+param([string]$Compiler, [switch]$Release)
 
 $ErrorActionPreference = 'Stop'
 
@@ -62,9 +62,11 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Could not compile the application icon resource.'
 }
 
+$optimizationArgs = if ($Release) { @('-Os', '-s') } else { @('-g', '-O0') }
+
 function Invoke-Build([string]$name, [string[]]$sourceFiles, [string[]]$extraArgs) {
     $destination = Join-Path $output $name
-    & $compilerPath -std=c11 -finput-charset=UTF-8 -g -O0 -Wall -Wextra "-I$include" "-I$appSourceDirectory" "-I$deviceSourceDirectory" @sourceFiles $resourceObject @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
+    & $compilerPath -std=c11 -finput-charset=UTF-8 @optimizationArgs -Wall -Wextra "-I$include" "-I$appSourceDirectory" "-I$deviceSourceDirectory" @sourceFiles $resourceObject @extraArgs -o $destination "-L$library" -lhidapi -luser32 -lbthprops -lshell32 -ladvapi32
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed: $name"
     }
