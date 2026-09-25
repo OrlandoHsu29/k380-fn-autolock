@@ -244,7 +244,7 @@ static void app_ui_add_tray_icon(HWND window)
     icon.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     icon.uCallbackMessage = WM_APP_TRAY_CALLBACK;
     icon.hIcon = g_app.fn_tray_icon != NULL ? g_app.fn_tray_icon : LoadIconW(NULL, MAKEINTRESOURCEW(32512));
-    wcscpy(icon.szTip, L"K380 Fn Auto Lock " APP_VERSION);
+    wcscpy(icon.szTip, L"K380 Fn auto lock");
     g_app.tray_icon_added = Shell_NotifyIconW(NIM_ADD, &icon) != FALSE;
 }
 
