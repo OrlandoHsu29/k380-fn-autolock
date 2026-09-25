@@ -36,17 +36,18 @@ static void apply_settings_font(HWND control)
         SendMessageW(control, WM_SETFONT, (WPARAM)g_app.settings_font, TRUE);
 }
 
-static void commit_settings(HWND window)
+static int commit_settings(HWND window)
 {
     if (!app_settings_set_autostart_enabled(settings_draft_autostart_enabled)) {
         MessageBoxW(window, L"无法更新当前用户的开机启动设置。", L"K380 Fn 设置", MB_OK | MB_ICONERROR);
-        return;
+        return 0;
     }
     if (settings_draft_fn_locked != g_app.fn_locked)
         app_runtime_set_mode(settings_draft_fn_locked);
     if (settings_draft_tray_visible != g_app.show_tray_icon)
         app_runtime_set_tray_visibility(settings_draft_tray_visible);
-    DestroyWindow(window);
+    app_ui_update();
+    return 1;
 }
 
 static int settings_have_unsaved_changes(void)
@@ -413,7 +414,8 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
                                      L"K380 Fn 设置",
                                      MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON1);
             if (choice == IDYES) {
-                commit_settings(window);
+                if (commit_settings(window))
+                    DestroyWindow(window);
                 return 0;
             }
             if (choice != IDNO)
