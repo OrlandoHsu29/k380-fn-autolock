@@ -48,6 +48,7 @@
 - 托盘菜单和设置窗口可切换 Fn 锁定、媒体键优先、开机自启和托盘图标显示状态。
 - 隐藏托盘图标不会关闭后台程序。再次运行 exe 会打开现有进程的设置窗口。
 - 首次手动运行 exe 会直接显示设置窗口；开机自启命令使用后台参数，不弹出窗口。
+- 关闭设置窗口后，当前进程会正常退出并以后台模式重新启动。这会释放设置窗口和输入法加载的组件，使常驻内存恢复到直接后台启动时的水平；从托盘菜单或窗口选择“退出程序”时不会重新启动。
 
 
 ## 构建
@@ -73,7 +74,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1 -Compiler '<MinGW 安装目
 安装 Inno Setup 7 后，可用 `build-installer.ps1` 完成 Release 构建并生成中英文安装包：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build-installer.ps1 -Version 1.0.2 -Compiler '<MinGW 安装目录>\bin\gcc.exe'
+powershell -ExecutionPolicy Bypass -File .\build-installer.ps1 -Version 1.0.3 -Compiler '<MinGW 安装目录>\bin\gcc.exe'
 ```
 
 安装包按当前用户安装到 `%LOCALAPPDATA%\Programs\K380-Fn-Auto-Lock`，无需管理员权限。卸载时会结束后台进程，并删除开机启动项、程序设置和安装目录。
