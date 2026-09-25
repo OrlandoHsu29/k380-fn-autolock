@@ -25,6 +25,7 @@
 static const wchar_t settings_window_class[] = L"K380FnAutoLockSettingsWindow";
 static HFONT settings_title_font;
 static HWND settings_title_label;
+static HWND settings_save_button;
 static int settings_draft_valid;
 static int settings_draft_fn_locked;
 static int settings_draft_tray_visible;
@@ -100,15 +101,21 @@ static void draw_settings_button(const DRAWITEMSTRUCT *item)
     if (is_close || is_ok) {
         COLORREF button_color = is_close
             ? ((item->itemState & ODS_SELECTED) ? RGB(166, 37, 42) : RGB(198, 48, 54))
-            : ((item->itemState & ODS_SELECTED) ? RGB(240, 243, 247) : RGB(255, 255, 255));
-        COLORREF border_color = is_close ? RGB(155, 32, 38) : RGB(190, 196, 204);
+            : (disabled
+                   ? RGB(240, 243, 247)
+                   : ((item->itemState & ODS_SELECTED) ? RGB(240, 243, 247) : RGB(255, 255, 255)));
+        COLORREF border_color = is_close
+            ? RGB(155, 32, 38)
+            : (disabled ? RGB(220, 224, 230) : RGB(190, 196, 204));
         HBRUSH button_brush = CreateSolidBrush(button_color);
         HBRUSH border_brush = CreateSolidBrush(border_color);
         FillRect(dc, &rect, button_brush);
         FrameRect(dc, &rect, border_brush);
         DeleteObject(button_brush);
         DeleteObject(border_brush);
-        SetTextColor(dc, is_close ? RGB(255, 255, 255) : RGB(38, 42, 48));
+        SetTextColor(dc, is_close
+                             ? RGB(255, 255, 255)
+                             : (disabled ? RGB(145, 145, 145) : RGB(38, 42, 48)));
         rect.top += (item->itemState & ODS_SELECTED) ? 1 : 0;
         DrawTextW(dc, label, -1, &rect, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
         if ((item->itemState & ODS_FOCUS) != 0)
@@ -182,7 +189,7 @@ void app_ui_update(void)
                        fn_mode_changed && settings_draft_fn_locked
                            ? L"锁定 Fn（F1–F12 优先）*"
                            : L"锁定 Fn（F1–F12 优先）");
-        EnableWindow(g_app.fn_lock_radio, !(settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked));
+        EnableWindow(g_app.fn_lock_radio, fn_mode_changed || !g_app.fn_locked);
         InvalidateRect(g_app.fn_lock_radio, NULL, TRUE);
     }
     if (g_app.fn_unlock_radio != NULL) {
@@ -190,7 +197,7 @@ void app_ui_update(void)
                        fn_mode_changed && !settings_draft_fn_locked
                            ? L"解除锁定（媒体键优先）*"
                            : L"解除锁定（媒体键优先）");
-        EnableWindow(g_app.fn_unlock_radio, settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked);
+        EnableWindow(g_app.fn_unlock_radio, fn_mode_changed || g_app.fn_locked);
         InvalidateRect(g_app.fn_unlock_radio, NULL, TRUE);
     }
     if (g_app.startup_checkbox != NULL)
@@ -206,6 +213,8 @@ void app_ui_update(void)
                    settings_have_unsaved_changes()
                        ? L"K380 Fn Auto Lock " APP_VERSION L"*"
                        : L"K380 Fn Auto Lock " APP_VERSION);
+    if (settings_save_button != NULL)
+        EnableWindow(settings_save_button, settings_have_unsaved_changes());
     if (g_app.status_label != NULL) {
         fn_locked = g_app.fn_locked;
         autostart_enabled = g_app.autostart_enabled;
@@ -241,7 +250,7 @@ static void app_ui_add_tray_icon(HWND window)
 
 void app_ui_show_settings(void)
 {
-    RECT rect = {0, 0, 360, 248};
+    RECT rect = {0, 0, 360, 278};
     DWORD style = WS_CAPTION | WS_SYSMENU | WS_POPUP;
     DWORD ex_style = WS_EX_APPWINDOW;
     int width;
@@ -335,7 +344,7 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
             int font_height = -MulDiv(9, dpi_y, 72);
             int title_font_height = -MulDiv(11, dpi_y, 72);
             HWND label;
-            HWND ok_button;
+            HWND system_label;
             HWND close_button;
 
             settings_draft_fn_locked = g_app.fn_locked;
@@ -360,35 +369,38 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
             16, 10, 320, 24, window, NULL, g_app.app_instance, NULL);
         g_app.status_label = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_CENTER,
             16, 36, 328, 20, window, NULL, g_app.app_instance, NULL);
-        g_app.startup_checkbox = CreateWindowExW(0, L"BUTTON", L"开机时自动启动",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
-            16, 64, 300, 24, window, (HMENU)(INT_PTR)IDC_STARTUP_CHECKBOX, g_app.app_instance, NULL);
         label = CreateWindowExW(0, L"STATIC", L"Fn 键模式：", WS_CHILD | WS_VISIBLE,
-            16, 98, 100, 20, window, NULL, g_app.app_instance, NULL);
+            16, 70, 100, 20, window, NULL, g_app.app_instance, NULL);
         g_app.fn_lock_radio = CreateWindowExW(0, L"BUTTON", L"锁定 Fn（F1–F12 优先）",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_GROUP | BS_OWNERDRAW,
-            26, 118, 280, 22, window, (HMENU)(INT_PTR)IDC_FN_LOCK_RADIO, g_app.app_instance, NULL);
+            26, 90, 280, 22, window, (HMENU)(INT_PTR)IDC_FN_LOCK_RADIO, g_app.app_instance, NULL);
         g_app.fn_unlock_radio = CreateWindowExW(0, L"BUTTON", L"解除锁定（媒体键优先）",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
-            26, 142, 280, 22, window, (HMENU)(INT_PTR)IDC_FN_UNLOCK_RADIO, g_app.app_instance, NULL);
+            26, 114, 280, 22, window, (HMENU)(INT_PTR)IDC_FN_UNLOCK_RADIO, g_app.app_instance, NULL);
+        system_label = CreateWindowExW(0, L"STATIC", L"系统设置：", WS_CHILD | WS_VISIBLE,
+            16, 150, 100, 20, window, NULL, g_app.app_instance, NULL);
+        g_app.startup_checkbox = CreateWindowExW(0, L"BUTTON", L"开机时自动启动",
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+            26, 170, 280, 24, window, (HMENU)(INT_PTR)IDC_STARTUP_CHECKBOX, g_app.app_instance, NULL);
         g_app.tray_checkbox = CreateWindowExW(0, L"BUTTON", L"隐藏任务栏图标",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
-            16, 174, 300, 24, window, (HMENU)(INT_PTR)IDC_TRAY_CHECKBOX, g_app.app_instance, NULL);
-        ok_button = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
-            68, 209, 104, 28, window, (HMENU)(INT_PTR)IDC_OK_BUTTON, g_app.app_instance, NULL);
+            26, 198, 280, 24, window, (HMENU)(INT_PTR)IDC_TRAY_CHECKBOX, g_app.app_instance, NULL);
+        settings_save_button = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+            68, 239, 104, 28, window, (HMENU)(INT_PTR)IDC_OK_BUTTON, g_app.app_instance, NULL);
         close_button = CreateWindowExW(0, L"BUTTON", L"退出程序", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
-            188, 209, 104, 28, window, (HMENU)(INT_PTR)IDC_CLOSE_BUTTON, g_app.app_instance, NULL);
+            188, 239, 104, 28, window, (HMENU)(INT_PTR)IDC_CLOSE_BUTTON, g_app.app_instance, NULL);
         if (settings_title_font != NULL)
             SendMessageW(settings_title_label, WM_SETFONT, (WPARAM)settings_title_font, TRUE);
         else
             apply_settings_font(settings_title_label);
         apply_settings_font(g_app.startup_checkbox);
         apply_settings_font(label);
+        apply_settings_font(system_label);
         apply_settings_font(g_app.fn_lock_radio);
         apply_settings_font(g_app.fn_unlock_radio);
         apply_settings_font(g_app.tray_checkbox);
         apply_settings_font(g_app.status_label);
-        apply_settings_font(ok_button);
+        apply_settings_font(settings_save_button);
         apply_settings_font(close_button);
         app_ui_update();
         return 0;
@@ -460,6 +472,7 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
     case WM_DESTROY:
         settings_draft_valid = 0;
         settings_title_label = NULL;
+        settings_save_button = NULL;
         if (settings_title_font != NULL)
             DeleteObject(settings_title_font);
         settings_title_font = NULL;
