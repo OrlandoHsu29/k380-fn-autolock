@@ -3,5 +3,6 @@
 
 void app_runtime_set_mode(int desired_fn_locked);
 void app_runtime_set_tray_visibility(int visible);
+void app_runtime_restart_in_background(void);
 
 #endif

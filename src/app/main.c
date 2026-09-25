@@ -10,6 +10,7 @@
 #include <bluetoothapis.h>
 #include <stddef.h>
 #include <string.h>
+#include <wchar.h>
 
 #include "app_state.h"
 #include "app_settings.h"
@@ -36,6 +37,31 @@ static const GUID hid_interface_guid = {
 static const GUID bluetooth_hci_event_guid = {
     0xfc240062, 0x1541, 0x49be, {0xb4, 0x63, 0x84, 0xc4, 0xdc, 0xd7, 0xbf, 0x7f}
 };
+static int restart_in_background;
+
+static int start_background_instance(void)
+{
+    wchar_t executable[MAX_PATH];
+    wchar_t command_line[MAX_PATH + 32];
+    STARTUPINFOW startup = {0};
+    PROCESS_INFORMATION process = {0};
+    DWORD length;
+
+    length = GetModuleFileNameW(NULL, executable, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+        return 0;
+    if (swprintf(command_line, sizeof(command_line) / sizeof(command_line[0]),
+                 L"\"%ls\" --background", executable) < 0)
+        return 0;
+
+    startup.cb = sizeof(startup);
+    if (!CreateProcessW(executable, command_line, NULL, NULL, FALSE, 0, NULL, NULL,
+                        &startup, &process))
+        return 0;
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return 1;
+}
 
 static size_t watch_bluetooth_radios(HWND window, radio_watch *radios, size_t capacity)
 {
@@ -135,6 +161,13 @@ void app_runtime_set_tray_visibility(int visible)
         MessageBoxW(g_app.settings_window, L"图标显示设置无法保存；本次运行仍会按当前选择处理。",
                     L"K380 Fn 设置", MB_OK | MB_ICONERROR);
     app_ui_set_tray_visibility(g_app.show_tray_icon);
+}
+
+void app_runtime_restart_in_background(void)
+{
+    restart_in_background = 1;
+    if (g_app.watcher_window != NULL)
+        PostMessageW(g_app.watcher_window, WM_CLOSE, 0, 0);
 }
 
 static LRESULT CALLBACK watch_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
@@ -311,6 +344,8 @@ cleanup:
     if (hid_initialized)
         hid_exit();
     CloseHandle(singleton);
+    if (restart_in_background && !start_background_instance())
+        return 1;
     return exit_code;
 }
 

@@ -58,6 +58,12 @@ static int settings_have_unsaved_changes(void)
             settings_draft_autostart_enabled != app_settings_autostart_enabled());
 }
 
+static void close_settings_and_restart(HWND window)
+{
+    DestroyWindow(window);
+    app_runtime_restart_in_background();
+}
+
 static void draw_settings_button(const DRAWITEMSTRUCT *item)
 {
     RECT rect = item->rcItem;
@@ -423,13 +429,13 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
                                      MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON1);
             if (choice == IDYES) {
                 if (commit_settings(window))
-                    DestroyWindow(window);
+                    close_settings_and_restart(window);
                 return 0;
             }
             if (choice != IDNO)
                 return 0;
         }
-        DestroyWindow(window);
+        close_settings_and_restart(window);
         return 0;
     case WM_DESTROY:
         settings_draft_valid = 0;
