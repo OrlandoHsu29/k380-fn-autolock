@@ -24,11 +24,37 @@
 
 static const wchar_t settings_window_class[] = L"K380FnAutoLockSettingsWindow";
 static HFONT settings_title_font;
+static HWND settings_title_label;
+static int settings_draft_valid;
+static int settings_draft_fn_locked;
+static int settings_draft_tray_visible;
+static int settings_draft_autostart_enabled;
 
 static void apply_settings_font(HWND control)
 {
     if (control != NULL && g_app.settings_font != NULL)
         SendMessageW(control, WM_SETFONT, (WPARAM)g_app.settings_font, TRUE);
+}
+
+static void commit_settings(HWND window)
+{
+    if (!app_settings_set_autostart_enabled(settings_draft_autostart_enabled)) {
+        MessageBoxW(window, L"无法更新当前用户的开机启动设置。", L"K380 Fn 设置", MB_OK | MB_ICONERROR);
+        return;
+    }
+    if (settings_draft_fn_locked != g_app.fn_locked)
+        app_runtime_set_mode(settings_draft_fn_locked);
+    if (settings_draft_tray_visible != g_app.show_tray_icon)
+        app_runtime_set_tray_visibility(settings_draft_tray_visible);
+    DestroyWindow(window);
+}
+
+static int settings_have_unsaved_changes(void)
+{
+    return settings_draft_valid &&
+           (settings_draft_fn_locked != g_app.fn_locked ||
+            settings_draft_tray_visible != g_app.show_tray_icon ||
+            settings_draft_autostart_enabled != app_settings_autostart_enabled());
 }
 
 static void draw_settings_button(const DRAWITEMSTRUCT *item)
@@ -50,13 +76,13 @@ static void draw_settings_button(const DRAWITEMSTRUCT *item)
 
     FillRect(dc, &rect, GetSysColorBrush(COLOR_WINDOW));
     if (control_id == IDC_STARTUP_CHECKBOX)
-        checked = g_app.autostart_enabled;
+        checked = settings_draft_valid ? settings_draft_autostart_enabled : g_app.autostart_enabled;
     else if (control_id == IDC_FN_LOCK_RADIO)
-        checked = g_app.fn_locked;
+        checked = settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked;
     else if (control_id == IDC_FN_UNLOCK_RADIO)
-        checked = !g_app.fn_locked;
+        checked = !(settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked);
     else if (control_id == IDC_TRAY_CHECKBOX)
-        checked = g_app.show_tray_icon;
+        checked = settings_draft_valid ? settings_draft_tray_visible : g_app.show_tray_icon;
 
     GetWindowTextW(item->hwndItem, label, sizeof(label) / sizeof(label[0]));
     SetBkMode(dc, TRANSPARENT);
@@ -134,17 +160,21 @@ void app_ui_update(void)
         return;
     g_app.autostart_enabled = app_settings_autostart_enabled();
     if (g_app.fn_lock_radio != NULL) {
-        EnableWindow(g_app.fn_lock_radio, !g_app.fn_locked);
+        EnableWindow(g_app.fn_lock_radio, !(settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked));
         InvalidateRect(g_app.fn_lock_radio, NULL, TRUE);
     }
     if (g_app.fn_unlock_radio != NULL) {
-        EnableWindow(g_app.fn_unlock_radio, g_app.fn_locked);
+        EnableWindow(g_app.fn_unlock_radio, settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked);
         InvalidateRect(g_app.fn_unlock_radio, NULL, TRUE);
     }
     if (g_app.startup_checkbox != NULL)
         InvalidateRect(g_app.startup_checkbox, NULL, TRUE);
     if (g_app.tray_checkbox != NULL)
         InvalidateRect(g_app.tray_checkbox, NULL, TRUE);
+    SetWindowTextW(g_app.settings_window,
+                   settings_have_unsaved_changes()
+                       ? L"K380 Fn Auto Lock " APP_VERSION L"*"
+                       : L"K380 Fn Auto Lock " APP_VERSION);
     if (g_app.status_label != NULL) {
         if (g_app.last_apply_result == 0)
             swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：已应用%ls",
@@ -224,11 +254,7 @@ static void handle_menu_command(UINT command)
         app_runtime_set_tray_visibility(0);
         break;
     case IDM_EXIT_PROGRAM:
-        if (MessageBoxW(g_app.settings_window,
-                        L"确定要退出程序吗？退出后，Fn 设置将不再自动恢复。",
-                        L"K380 Fn Auto Lock",
-                        MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES &&
-            g_app.watcher_window != NULL)
+        if (g_app.watcher_window != NULL)
             PostMessageW(g_app.watcher_window, WM_CLOSE, 0, 0);
         break;
     }
@@ -273,10 +299,14 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
             int dpi_y = dc != NULL ? GetDeviceCaps(dc, LOGPIXELSY) : 96;
             int font_height = -MulDiv(9, dpi_y, 72);
             int title_font_height = -MulDiv(11, dpi_y, 72);
-            HWND title_label;
             HWND label;
             HWND ok_button;
             HWND close_button;
+
+            settings_draft_fn_locked = g_app.fn_locked;
+            settings_draft_tray_visible = g_app.show_tray_icon;
+            settings_draft_autostart_enabled = app_settings_autostart_enabled();
+            settings_draft_valid = 1;
 
             if (dc != NULL)
                 ReleaseDC(window, dc);
@@ -290,7 +320,7 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
                                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                                         CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
 
-        title_label = CreateWindowExW(0, L"STATIC", L"K380 Fn 设置",
+        settings_title_label = CreateWindowExW(0, L"STATIC", L"K380 Fn 设置",
             WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE,
             16, 10, 320, 24, window, NULL, g_app.app_instance, NULL);
         g_app.status_label = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_CENTER,
@@ -309,14 +339,14 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
         g_app.tray_checkbox = CreateWindowExW(0, L"BUTTON", L"显示任务栏图标",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
             16, 174, 300, 24, window, (HMENU)(INT_PTR)IDC_TRAY_CHECKBOX, g_app.app_instance, NULL);
-        ok_button = CreateWindowExW(0, L"BUTTON", L"确定", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+        ok_button = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
             68, 209, 104, 28, window, (HMENU)(INT_PTR)IDC_OK_BUTTON, g_app.app_instance, NULL);
         close_button = CreateWindowExW(0, L"BUTTON", L"退出程序", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
             188, 209, 104, 28, window, (HMENU)(INT_PTR)IDC_CLOSE_BUTTON, g_app.app_instance, NULL);
         if (settings_title_font != NULL)
-            SendMessageW(title_label, WM_SETFONT, (WPARAM)settings_title_font, TRUE);
+            SendMessageW(settings_title_label, WM_SETFONT, (WPARAM)settings_title_font, TRUE);
         else
-            apply_settings_font(title_label);
+            apply_settings_font(settings_title_label);
         apply_settings_font(g_app.startup_checkbox);
         apply_settings_font(label);
         apply_settings_font(g_app.fn_lock_radio);
@@ -348,21 +378,23 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
     case WM_COMMAND:
         switch (LOWORD(wparam)) {
         case IDC_STARTUP_CHECKBOX:
-            if (!app_settings_set_autostart_enabled(!app_settings_autostart_enabled()))
-                MessageBoxW(window, L"无法更新当前用户的开机启动设置。", L"K380 Fn 设置", MB_OK | MB_ICONERROR);
+            settings_draft_autostart_enabled = !settings_draft_autostart_enabled;
             app_ui_update();
             return 0;
         case IDC_FN_LOCK_RADIO:
-            app_runtime_set_mode(1);
+            settings_draft_fn_locked = 1;
+            app_ui_update();
             return 0;
         case IDC_FN_UNLOCK_RADIO:
-            app_runtime_set_mode(0);
+            settings_draft_fn_locked = 0;
+            app_ui_update();
             return 0;
         case IDC_TRAY_CHECKBOX:
-            app_runtime_set_tray_visibility(!g_app.show_tray_icon);
+            settings_draft_tray_visible = !settings_draft_tray_visible;
+            app_ui_update();
             return 0;
         case IDC_OK_BUTTON:
-            DestroyWindow(window);
+            commit_settings(window);
             return 0;
         case IDC_CLOSE_BUTTON:
             if (MessageBoxW(window,
@@ -375,9 +407,23 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
         }
         break;
     case WM_CLOSE:
+        if (settings_have_unsaved_changes()) {
+            int choice = MessageBoxW(window,
+                                     L"有未保存的设置。是否保存更改？",
+                                     L"K380 Fn 设置",
+                                     MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON1);
+            if (choice == IDYES) {
+                commit_settings(window);
+                return 0;
+            }
+            if (choice != IDNO)
+                return 0;
+        }
         DestroyWindow(window);
         return 0;
     case WM_DESTROY:
+        settings_draft_valid = 0;
+        settings_title_label = NULL;
         if (settings_title_font != NULL)
             DeleteObject(settings_title_font);
         settings_title_font = NULL;
