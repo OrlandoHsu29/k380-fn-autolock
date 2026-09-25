@@ -39,11 +39,11 @@ Copy-Item -LiteralPath $builtExecutable -Destination $executable -Force
 Copy-Item -LiteralPath $builtLibrary -Destination (Join-Path $installDirectory 'hidapi.dll') -Force
 Copy-Item -LiteralPath $builtLibraryLicense -Destination (Join-Path $installDirectory 'LICENSE-hidapi-bsd.txt') -Force
 New-Item -Path $runKey -Force | Out-Null
-New-ItemProperty -Path $runKey -Name $entryName -PropertyType String -Value ('"{0}"' -f $executable) -Force | Out-Null
-$process = Start-Process -FilePath $executable -WindowStyle Hidden -PassThru
+New-ItemProperty -Path $runKey -Name $entryName -PropertyType String -Value ('"{0}" --background' -f $executable) -Force | Out-Null
+$process = Start-Process -FilePath $executable -ArgumentList '--background' -WindowStyle Hidden -PassThru
 Start-Sleep -Milliseconds 500
 $process.Refresh()
 if ($process.HasExited) {
     throw "K380 Fn auto lock exited immediately with code $($process.ExitCode)."
 }
-Write-Host "K380 Fn auto lock is running (PID $($process.Id)) and will start when this user logs in."
+Write-Host "K380 Fn auto lock is running (PID $($process.Id)) and will start when Windows starts."

@@ -90,7 +90,7 @@ int app_settings_set_autostart_enabled(int enabled)
 
     {
         wchar_t executable[MAX_PATH];
-        wchar_t command[MAX_PATH + 4];
+        wchar_t command[MAX_PATH + 16];
         DWORD length = GetModuleFileNameW(NULL, executable, MAX_PATH);
         DWORD bytes;
 
@@ -99,8 +99,9 @@ int app_settings_set_autostart_enabled(int enabled)
         command[0] = L'"';
         memcpy(command + 1, executable, length * sizeof(wchar_t));
         command[length + 1] = L'"';
-        command[length + 2] = L'\0';
-        bytes = (length + 3) * sizeof(wchar_t);
+        command[length + 2] = L' ';
+        memcpy(command + length + 3, L"--background", sizeof(L"--background"));
+        bytes = (length + 3) * sizeof(wchar_t) + sizeof(L"--background");
 
         result = RegCreateKeyExW(HKEY_CURRENT_USER, REGISTRY_RUN_KEY, 0, NULL, 0,
                                  KEY_SET_VALUE, NULL, &key, NULL);

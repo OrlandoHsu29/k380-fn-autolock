@@ -8,7 +8,7 @@
 | --- | --- |
 | `src/app/main.c` | 程序入口、设备与唤醒事件监听、恢复调度 |
 | `src/device/k380_hid.c` / `k380_hid.h` | 查找 K380 HID 接口并发送按键模式报告 |
-| `src/app/app_settings.c` / `app_settings.h` | 保存 Fn 模式、图标显示和登录自启设置 |
+| `src/app/app_settings.c` / `app_settings.h` | 保存 Fn 模式、图标显示和开机自启设置 |
 | `src/app/app_ui.c` / `app_ui.h` | 设置窗口、托盘图标和菜单 |
 | `src/app/app_state.c` / `app_state.h` | 后台运行期间共享的应用状态 |
 | `resources/app-icon.rc` | 将 `media/` 下的 ICO 图标嵌入程序 |
@@ -44,10 +44,11 @@
 ## 设置与托盘行为
 
 - Fn 模式和托盘图标显示状态保存在 `HKCU\Software\K380FnAutoLock`。
-- 登录自启使用当前用户的 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`，不需要管理员权限。
-- 托盘菜单和设置窗口可切换 Fn 锁定、媒体键优先、登录自启和托盘图标显示状态。
+- 开机自启使用当前用户的 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`，不需要管理员权限。
+- 托盘菜单和设置窗口可切换 Fn 锁定、媒体键优先、开机自启和托盘图标显示状态。
 - 隐藏托盘图标不会关闭后台程序。再次运行 exe 会打开现有进程的设置窗口。
-- 设置窗口的 X 只关闭窗口；点击“退出程序”会先确认，再结束后台进程。退出不会删除登录自启设置。
+- 首次手动运行 exe 会直接显示设置窗口；开机自启命令使用后台参数，不弹出窗口。
+- 设置窗口的 X 和“确定”按钮只关闭窗口；点击“退出程序”会先确认，再结束后台进程。退出不会删除开机自启设置。
 
 ## 构建
 
@@ -70,4 +71,4 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1 -Compiler '<MinGW 安装目
 - `setMediaKeys.exe`：手动设置媒体键优先
 - `hidapi.dll`：与构建架构对应的 HIDAPI 动态库
 
-`startup.ps1` 是本地安装辅助脚本：它将后台程序、DLL 和 HIDAPI 授权文本复制到 `installed/`，添加当前用户登录启动项并启动程序。运行 `powershell -ExecutionPolicy Bypass -File .\startup.ps1 -Remove` 可移除启动项并关闭该脚本安装的程序。
+`startup.ps1` 是本地安装辅助脚本：它将后台程序、DLL 和 HIDAPI 授权文本复制到 `installed/`，添加当前用户开机启动项并启动程序。运行 `powershell -ExecutionPolicy Bypass -File .\startup.ps1 -Remove` 可移除启动项并关闭该脚本安装的程序。

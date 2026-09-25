@@ -188,9 +188,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command_line, i
     int watcher_class_registered = 0;
     int ui_class_registered = 0;
     int timer_started = 0;
+    int show_settings_on_start = command_line == NULL || strstr(command_line, "--background") == NULL;
 
     (void)previous;
-    (void)command_line;
     (void)show_command;
 
     singleton = CreateMutexW(NULL, FALSE, L"Local\\K380FnAutoLock");
@@ -205,7 +205,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command_line, i
             if (window == NULL)
                 Sleep(50);
         }
-        if (window != NULL)
+        if (window != NULL && show_settings_on_start)
             PostMessageW(window, WM_APP_SHOW_SETTINGS, 0, 0);
         return 0;
     }
@@ -259,8 +259,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command_line, i
     radio_count = watch_bluetooth_radios(window, radios, MAX_RADIO_WATCHES);
     app_ui_set_tray_visibility(g_app.show_tray_icon);
 
-    /* Apply at login, even if no device-change event is emitted. */
+    /* Apply at startup, even if no device-change event is emitted. */
     try_apply();
+    if (show_settings_on_start)
+        app_ui_show_settings();
     while ((message_result = GetMessageW(&message, NULL, 0, 0)) > 0) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
