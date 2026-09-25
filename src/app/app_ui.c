@@ -83,7 +83,7 @@ static void draw_settings_button(const DRAWITEMSTRUCT *item)
     else if (control_id == IDC_FN_UNLOCK_RADIO)
         checked = !(settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked);
     else if (control_id == IDC_TRAY_CHECKBOX)
-        checked = settings_draft_valid ? settings_draft_tray_visible : g_app.show_tray_icon;
+        checked = !(settings_draft_valid ? settings_draft_tray_visible : g_app.show_tray_icon);
 
     GetWindowTextW(item->hwndItem, label, sizeof(label) / sizeof(label[0]));
     SetBkMode(dc, TRANSPARENT);
@@ -156,6 +156,10 @@ static void draw_settings_button(const DRAWITEMSTRUCT *item)
 void app_ui_update(void)
 {
     wchar_t status[128];
+    int fn_locked;
+    int autostart_enabled;
+    int tray_hidden;
+    const wchar_t *mode_status;
 
     if (g_app.settings_window == NULL)
         return;
@@ -177,14 +181,18 @@ void app_ui_update(void)
                        ? L"K380 Fn Auto Lock " APP_VERSION L"*"
                        : L"K380 Fn Auto Lock " APP_VERSION);
     if (g_app.status_label != NULL) {
-        if (g_app.last_apply_result == 0)
-            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：已应用%ls",
-                     g_app.fn_locked ? L" Fn 锁定" : L"媒体键优先");
-        else if (g_app.last_apply_result == 1)
-            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：等待 K380 连接，将自动应用%ls",
-                     g_app.fn_locked ? L" Fn 锁定" : L"媒体键优先");
+        fn_locked = settings_draft_valid ? settings_draft_fn_locked : g_app.fn_locked;
+        autostart_enabled = settings_draft_valid ? settings_draft_autostart_enabled : g_app.autostart_enabled;
+        tray_hidden = !(settings_draft_valid ? settings_draft_tray_visible : g_app.show_tray_icon);
+        mode_status = fn_locked ? L"F 键优先" : L"媒体键优先";
+        if (autostart_enabled && tray_hidden)
+            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：开机自启、%ls、隐藏图标", mode_status);
+        else if (autostart_enabled)
+            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：开机自启、%ls", mode_status);
+        else if (tray_hidden)
+            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：%ls、隐藏图标", mode_status);
         else
-            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：HID 接口暂不可写，将继续重试");
+            swprintf(status, sizeof(status) / sizeof(status[0]), L"状态：%ls", mode_status);
         SetWindowTextW(g_app.status_label, status);
     }
 }
@@ -337,7 +345,7 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
         g_app.fn_unlock_radio = CreateWindowExW(0, L"BUTTON", L"解除锁定（媒体键优先）",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
             26, 142, 280, 22, window, (HMENU)(INT_PTR)IDC_FN_UNLOCK_RADIO, g_app.app_instance, NULL);
-        g_app.tray_checkbox = CreateWindowExW(0, L"BUTTON", L"显示任务栏图标",
+        g_app.tray_checkbox = CreateWindowExW(0, L"BUTTON", L"隐藏任务栏图标",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
             16, 174, 300, 24, window, (HMENU)(INT_PTR)IDC_TRAY_CHECKBOX, g_app.app_instance, NULL);
         ok_button = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
@@ -399,7 +407,7 @@ static LRESULT CALLBACK settings_window_proc(HWND window, UINT message, WPARAM w
             return 0;
         case IDC_CLOSE_BUTTON:
             if (MessageBoxW(window,
-                            L"确定要退出程序吗？退出后，Fn 设置将不再自动恢复。",
+                            L"确定要退出程序吗？退出后，Fn 设置将不再生效。",
                             L"K380 Fn Auto Lock",
                             MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES &&
                 g_app.watcher_window != NULL)
