@@ -77,4 +77,5 @@ Invoke-Build 'setMediaKeys.exe' @($source, $hidSource) @('-DsetMediaKeys')
 Invoke-Build 'k380FnAutoLock.exe' @($source, $hidSource, $settingsSource, $stateSource, $uiSource) @('-DAUTO_WATCH', '-mwindows')
 Copy-Item -LiteralPath (Join-Path $library 'hidapi.dll') -Destination (Join-Path $output 'hidapi.dll') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hidapi\LICENSE-bsd.txt') -Destination (Join-Path $output 'LICENSE-hidapi-bsd.txt') -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'LICENSE') -Destination (Join-Path $output 'LICENSE') -Force
 Write-Host "Built K380 tools for $architecture in $output"

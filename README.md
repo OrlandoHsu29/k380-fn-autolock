@@ -33,3 +33,9 @@
 ## 参考项目
 
 项目设备命令参考了 [dheygere/k380-fn-lock-for-windows](https://github.com/dheygere/k380-fn-lock-for-windows)、[k810fn](https://github.com/keighrim/k810fn/blob/master/win/k810fn/k810fnCLI.cpp) 和 [k380-function-keys-conf](https://github.com/jergusg/k380-function-keys-conf/blob/master/k380_conf.c)。HIDAPI 来源于 [libusb/hidapi](https://github.com/libusb/hidapi)，其 BSD 授权文本随仓库附带。
+
+## 开源协议
+
+本项目原创代码采用 [MIT License](LICENSE)，允许使用、修改和商业分发，分发时须保留版权声明和许可文本。软件按原样提供，不作任何担保。
+
+第三方组件 HIDAPI 仍遵循其 [BSD 授权](hidapi/LICENSE-bsd.txt)。构建产物和安装包均附带本项目的 `LICENSE` 和 HIDAPI 的 `LICENSE-hidapi-bsd.txt`。

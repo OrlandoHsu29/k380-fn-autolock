@@ -52,6 +52,7 @@ Name: "autostart"; Description: "{cm:AutoStartTask}"; Flags: checkedonce
 Source: "..\build\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\hidapi.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\LICENSE-hidapi-bsd.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

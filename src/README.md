@@ -88,5 +88,7 @@ powershell -ExecutionPolicy Bypass -File .\build-installer.ps1 -Version 1.0.4 -C
 - `setFnKeys.exe`：手动设置 F1–F12 优先
 - `setMediaKeys.exe`：手动设置媒体键优先
 - `hidapi.dll`：与构建架构对应的 HIDAPI 动态库
+- `LICENSE`：本项目的 MIT 授权文本
+- `LICENSE-hidapi-bsd.txt`：HIDAPI 的 BSD 授权文本
 
-`startup.ps1` 是本地安装辅助脚本：它将后台程序、DLL 和 HIDAPI 授权文本复制到 `installed/`，添加当前用户开机启动项并启动程序。运行 `powershell -ExecutionPolicy Bypass -File .\startup.ps1 -Remove` 可移除启动项并关闭该脚本安装的程序。
+`startup.ps1` 是本地安装辅助脚本：它将后台程序、DLL、本项目和 HIDAPI 的授权文本复制到 `installed/`，添加当前用户开机启动项并启动程序。运行 `powershell -ExecutionPolicy Bypass -File .\startup.ps1 -Remove` 可移除启动项并关闭该脚本安装的程序。
